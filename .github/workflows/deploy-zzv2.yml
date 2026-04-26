@@ -133,17 +133,11 @@ jobs:
           )
 
           remote_path=$(printf '%q' "$DEPLOY_PATH")
-          ssh "${ssh_base[@]}" -p "$port" "$SERVER_USER@$SERVER_HOST" "mkdir -p $remote_path/nginx $remote_path/releases"
+          ssh "${ssh_base[@]}" -p "$port" "$SERVER_USER@$SERVER_HOST" "mkdir -p $remote_path"
           scp "${ssh_base[@]}" -P "$port" \
             deploy/zzv2/docker-compose.yml \
-            deploy/zzv2/docker-compose.postgres.yml \
-            deploy/zzv2/docker-compose.redis.yml \
-            deploy/zzv2/.env.example \
             deploy/zzv2/remote-deploy.sh \
             "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/"
-          scp "${ssh_base[@]}" -P "$port" \
-            deploy/zzv2/nginx/sub2api-zzv2.conf \
-            "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/nginx/sub2api-zzv2.conf"
 
           remote_env="DEPLOY_DIR=$(printf '%q' "$DEPLOY_PATH") IMAGE_TAG=$(printf '%q' "$IMAGE_TAG") GHCR_USERNAME=$(printf '%q' "$GHCR_USERNAME") GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN")"
           ssh "${ssh_base[@]}" -p "$port" "$SERVER_USER@$SERVER_HOST" "$remote_env bash -s" <<'REMOTE_SCRIPT'
