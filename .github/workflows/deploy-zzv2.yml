@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: deploy-zzv2
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   DEPLOY_HOST: ${{ secrets.SERVER_HOST }}
