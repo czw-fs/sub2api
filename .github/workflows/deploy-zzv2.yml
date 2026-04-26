@@ -88,7 +88,9 @@ jobs:
             "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/nginx/sub2api-zzv2.conf"
           scp -i ~/.ssh/zzv2_deploy_key -P "${DEPLOY_PORT}" \
             sub2api-image.tar.gz \
-            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/releases/sub2api-image-${{ steps.meta.outputs.image_tag }}.tar.gz"
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/releases/sub2api-image-${{ steps.meta.outputs.image_tag }}.tar.gz.part"
+          ssh -i ~/.ssh/zzv2_deploy_key -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "mv '${DEPLOY_DIR}/releases/sub2api-image-${{ steps.meta.outputs.image_tag }}.tar.gz.part' '${DEPLOY_DIR}/releases/sub2api-image-${{ steps.meta.outputs.image_tag }}.tar.gz'"
 
       - name: Deploy on server
         shell: bash

@@ -64,8 +64,11 @@ else
   printf 'APP_IMAGE=%s\n' "${APP_IMAGE}" >> .env
 fi
 
-if [ -f "${IMAGE_ARCHIVE}" ]; then
+if [ -s "${IMAGE_ARCHIVE}" ]; then
   gzip -dc "${IMAGE_ARCHIVE}" | docker load
+else
+  echo "Image archive is missing or empty: ${IMAGE_ARCHIVE}" >&2
+  exit 1
 fi
 
 ln -sfn "${NGINX_TARGET}" "${NGINX_LINK}"
