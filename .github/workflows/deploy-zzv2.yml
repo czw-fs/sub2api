@@ -136,6 +136,8 @@ jobs:
           ssh "${ssh_base[@]}" -p "$port" "$SERVER_USER@$SERVER_HOST" "mkdir -p $remote_path/nginx $remote_path/releases"
           scp "${ssh_base[@]}" -P "$port" \
             deploy/zzv2/docker-compose.yml \
+            deploy/zzv2/docker-compose.postgres.yml \
+            deploy/zzv2/docker-compose.redis.yml \
             deploy/zzv2/.env.example \
             deploy/zzv2/remote-deploy.sh \
             "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/"

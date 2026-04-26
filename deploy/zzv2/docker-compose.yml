@@ -21,8 +21,8 @@ services:
       - SERVER_FRONTEND_URL=${SERVER_FRONTEND_URL:-http://111.228.39.25}
       - SERVER_TRUSTED_PROXIES=${SERVER_TRUSTED_PROXIES:-127.0.0.1}
       - RUN_MODE=${RUN_MODE:-standard}
-      - DATABASE_HOST=postgres
-      - DATABASE_PORT=5432
+      - DATABASE_HOST=${DATABASE_HOST:-zzv2-postgres}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
       - DATABASE_USER=${POSTGRES_USER:-sub2api}
       - DATABASE_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       - DATABASE_DBNAME=${POSTGRES_DB:-sub2api}
@@ -31,8 +31,8 @@ services:
       - DATABASE_MAX_IDLE_CONNS=${DATABASE_MAX_IDLE_CONNS:-10}
       - DATABASE_CONN_MAX_LIFETIME_MINUTES=${DATABASE_CONN_MAX_LIFETIME_MINUTES:-30}
       - DATABASE_CONN_MAX_IDLE_TIME_MINUTES=${DATABASE_CONN_MAX_IDLE_TIME_MINUTES:-5}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - REDIS_HOST=${REDIS_HOST:-zzv2-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - REDIS_DB=${REDIS_DB:-0}
       - REDIS_POOL_SIZE=${REDIS_POOL_SIZE:-1024}
@@ -54,74 +54,15 @@ services:
       - GEMINI_CLI_OAUTH_CLIENT_SECRET=${GEMINI_CLI_OAUTH_CLIENT_SECRET:-}
       - ANTIGRAVITY_OAUTH_CLIENT_SECRET=${ANTIGRAVITY_OAUTH_CLIENT_SECRET:-}
       - OPS_ENABLED=${OPS_ENABLED:-false}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     networks:
-      - zzv2-sub2api
+      - zzv2-system
     healthcheck:
       test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
-
-  postgres:
-    image: postgres:18-alpine
-    container_name: zzv2-sub2api-postgres
-    restart: unless-stopped
-    ulimits:
-      nofile:
-        soft: 100000
-        hard: 100000
-    volumes:
-      - ./postgres_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER:-sub2api}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      - POSTGRES_DB=${POSTGRES_DB:-sub2api}
-      - PGDATA=/var/lib/postgresql/data
-      - TZ=${TZ:-Asia/Shanghai}
-    networks:
-      - zzv2-sub2api
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sub2api} -d ${POSTGRES_DB:-sub2api}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  redis:
-    image: redis:8-alpine
-    container_name: zzv2-sub2api-redis
-    restart: unless-stopped
-    ulimits:
-      nofile:
-        soft: 100000
-        hard: 100000
-    volumes:
-      - ./redis_data:/data
-    command: >
-      sh -c '
-        redis-server
-        --save 60 1
-        --appendonly yes
-        --appendfsync everysec
-        ${REDIS_PASSWORD:+--requirepass "$REDIS_PASSWORD"}'
-    environment:
-      - TZ=${TZ:-Asia/Shanghai}
-      - REDISCLI_AUTH=${REDIS_PASSWORD:-}
-    networks:
-      - zzv2-sub2api
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-
 networks:
-  zzv2-sub2api:
-    driver: bridge
+  zzv2-system:
+    external: true
+    name: zzv2-system
