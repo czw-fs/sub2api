@@ -7,7 +7,6 @@ IMAGE_TAG="${IMAGE_TAG:-latest}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 NGINX_LINK="/etc/nginx/conf.d/sub2api-zzv2.conf"
 NGINX_TARGET="${DEPLOY_DIR}/nginx/sub2api-zzv2.conf"
-IMAGE_ARCHIVE="${DEPLOY_DIR}/releases/sub2api-image-${IMAGE_TAG}.tar.gz"
 
 cd "${DEPLOY_DIR}"
 
@@ -64,17 +63,15 @@ else
   printf 'APP_IMAGE=%s\n' "${APP_IMAGE}" >> .env
 fi
 
-if [ -s "${IMAGE_ARCHIVE}" ]; then
-  gzip -dc "${IMAGE_ARCHIVE}" | docker load
-else
-  echo "Image archive is missing or empty: ${IMAGE_ARCHIVE}" >&2
-  exit 1
+if [ -n "${GHCR_TOKEN:-}" ]; then
+  printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME:-github-actions}" --password-stdin
 fi
 
 ln -sfn "${NGINX_TARGET}" "${NGINX_LINK}"
 nginx -t
 systemctl reload nginx
 
+docker compose --env-file .env -f "${COMPOSE_FILE}" pull sub2api
 docker compose --env-file .env -f "${COMPOSE_FILE}" up -d --remove-orphans
 
 for i in $(seq 1 60); do
