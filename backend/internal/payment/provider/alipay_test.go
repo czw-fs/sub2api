@@ -136,6 +136,44 @@ func TestNewAlipay(t *testing.T) {
 	}
 }
 
+func TestAlipayClientDefaultsToSandbox(t *testing.T) {
+	origNewClient := alipayNewClient
+	t.Cleanup(func() {
+		alipayNewClient = origNewClient
+	})
+
+	var gotProduction *bool
+	alipayNewClient = func(appID, privateKey string, production bool, opts ...alipay.OptionFunc) (*alipay.Client, error) {
+		gotProduction = &production
+		if appID != "sandbox-app" {
+			t.Fatalf("appID = %q, want sandbox-app", appID)
+		}
+		if privateKey != "sandbox-private-key" {
+			t.Fatalf("privateKey = %q, want sandbox-private-key", privateKey)
+		}
+		return &alipay.Client{}, nil
+	}
+
+	provider := &Alipay{
+		config: map[string]string{
+			"appId":      "sandbox-app",
+			"privateKey": "sandbox-private-key",
+			"publicKey":  "not-a-public-key",
+		},
+	}
+
+	_, err := provider.getClient()
+	if err == nil || !strings.Contains(err.Error(), "alipay load public key") {
+		t.Fatalf("getClient error = %v, want public key load error after client initialization", err)
+	}
+	if gotProduction == nil {
+		t.Fatal("alipay client was not initialized")
+	}
+	if *gotProduction {
+		t.Fatal("alipay client production = true, want false for sandbox mode")
+	}
+}
+
 func TestCreateTradeUsesPagePayForDesktop(t *testing.T) {
 	origPreCreate := alipayTradePreCreate
 	origPagePay := alipayTradePagePay

@@ -28,6 +28,8 @@ const (
 )
 
 var (
+	alipayNewClient = alipay.New
+
 	alipayTradeWapPay = func(client *alipay.Client, param alipay.TradeWapPay) (*url.URL, error) {
 		return client.TradeWapPay(param)
 	}
@@ -68,7 +70,7 @@ func (a *Alipay) getClient() (*alipay.Client, error) {
 	if a.client != nil {
 		return a.client, nil
 	}
-	client, err := alipay.New(a.config["appId"], a.config["privateKey"], true)
+	client, err := alipayNewClient(a.config["appId"], a.config["privateKey"], false)
 	if err != nil {
 		return nil, fmt.Errorf("alipay init client: %w", err)
 	}
