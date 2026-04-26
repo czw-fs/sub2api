@@ -8,6 +8,32 @@ COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 NGINX_LINK="/etc/nginx/conf.d/sub2api-zzv2.conf"
 NGINX_TARGET="${DEPLOY_DIR}/nginx/sub2api-zzv2.conf"
 
+set_env_value() {
+  key="$1"
+  value="$2"
+  tmp_file="$(mktemp)"
+  if [ -f .env ]; then
+    awk -v key="$key" -v value="$value" '
+      BEGIN { found = 0 }
+      $0 ~ "^" key "=" {
+        print key "=" value
+        found = 1
+        next
+      }
+      { print }
+      END {
+        if (!found) {
+          print key "=" value
+        }
+      }
+    ' .env > "$tmp_file"
+  else
+    printf '%s=%s\n' "$key" "$value" > "$tmp_file"
+  fi
+  cat "$tmp_file" > .env
+  rm -f "$tmp_file"
+}
+
 cd "${DEPLOY_DIR}"
 
 mkdir -p data postgres_data redis_data releases nginx
@@ -51,17 +77,13 @@ OPS_ENABLED=false
 EOF
 fi
 
-if grep -q '^IMAGE_TAG=' .env; then
-  sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" .env
-else
-  printf '\nIMAGE_TAG=%s\n' "${IMAGE_TAG}" >> .env
+if [ "${IMAGE_TAG#*:}" != "${IMAGE_TAG}" ]; then
+  APP_IMAGE="${IMAGE_TAG%:*}"
+  IMAGE_TAG="${IMAGE_TAG##*:}"
 fi
 
-if grep -q '^APP_IMAGE=' .env; then
-  sed -i "s/^APP_IMAGE=.*/APP_IMAGE=${APP_IMAGE}/" .env
-else
-  printf 'APP_IMAGE=%s\n' "${APP_IMAGE}" >> .env
-fi
+set_env_value IMAGE_TAG "${IMAGE_TAG}"
+set_env_value APP_IMAGE "${APP_IMAGE}"
 
 if [ -n "${GHCR_TOKEN:-}" ]; then
   printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME:-github-actions}" --password-stdin
@@ -71,7 +93,15 @@ ln -sfn "${NGINX_TARGET}" "${NGINX_LINK}"
 nginx -t
 systemctl reload nginx
 
-docker compose --env-file .env -f "${COMPOSE_FILE}" pull sub2api
+for attempt in 1 2 3 4 5; do
+  if docker compose --env-file .env -f "${COMPOSE_FILE}" pull sub2api; then
+    break
+  fi
+  if [ "$attempt" -eq 5 ]; then
+    exit 1
+  fi
+  sleep $((attempt * 10))
+done
 docker compose --env-file .env -f "${COMPOSE_FILE}" up -d --remove-orphans
 
 for i in $(seq 1 60); do

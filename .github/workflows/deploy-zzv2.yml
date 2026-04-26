@@ -6,58 +6,66 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: read
-  packages: write
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+  DEPLOY_PATH: /work/project/zzv2
 
 concurrency:
   group: deploy-zzv2
   cancel-in-progress: true
 
-env:
-  DEPLOY_HOST: ${{ secrets.SERVER_HOST || '111.228.39.25' }}
-  DEPLOY_USER: ${{ secrets.SERVERUSER || 'root' }}
-  DEPLOY_PORT: ${{ secrets.SERVER_PORT || '22' }}
-  DEPLOY_DIR: /work/project/zzv2
-
 jobs:
-  deploy:
+  build:
+    name: Build Docker image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      image_tag: ${{ steps.meta.outputs.image_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set image tag
+      - name: Normalize image name
         id: meta
         shell: bash
         run: |
-          short_sha="${GITHUB_SHA::12}"
-          image_repo="ghcr.io/${GITHUB_REPOSITORY,,}"
-          echo "image=${image_repo}" >> "$GITHUB_OUTPUT"
-          echo "image_tag=sha-${short_sha}" >> "$GITHUB_OUTPUT"
+          image_name="${IMAGE_NAME,,}"
+          image_tag="${image_name}:sha-${GITHUB_SHA::12}"
+          {
+            echo "tags<<EOF"
+            echo "${image_tag}"
+            echo "${image_name}:zzv2-latest"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "image=${image_name}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
           echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GHCR
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker image
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
+          platforms: linux/amd64
           push: true
+          tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: |
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.image_tag }}
-            ${{ steps.meta.outputs.image }}:zzv2-latest
+          provenance: false
+          sbom: false
           build-args: |
             VERSION=zzv2-${{ steps.meta.outputs.image_tag }}
             COMMIT=${{ github.sha }}
@@ -67,36 +75,78 @@ jobs:
             PNPM_VERSION=9.15.9
             NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 
-      - name: Prepare SSH
-        shell: bash
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.ZZV2_DEPLOY_SSH_KEY }}
-        run: |
-          test -n "${DEPLOY_SSH_KEY}" || { echo "Missing secret ZZV2_DEPLOY_SSH_KEY"; exit 1; }
-          test -n "${DEPLOY_HOST}" || { echo "Missing secret SERVER_HOST"; exit 1; }
-          test -n "${DEPLOY_USER}" || { echo "Missing secret SERVERUSER"; exit 1; }
-          test -n "${DEPLOY_PORT}" || { echo "Missing secret SERVER_PORT"; exit 1; }
-          mkdir -p ~/.ssh
-          printf '%s\n' "${DEPLOY_SSH_KEY}" > ~/.ssh/zzv2_deploy_key
-          chmod 600 ~/.ssh/zzv2_deploy_key
-          ssh-keyscan -p "${DEPLOY_PORT}" "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+  deploy:
+    name: Deploy to server
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref_name == github.event.repository.default_branch
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout deploy files
+        uses: actions/checkout@v6
 
-      - name: Sync deployment files
+      - name: Deploy to server
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
+          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          ssh -i ~/.ssh/zzv2_deploy_key -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "mkdir -p '${DEPLOY_DIR}/nginx' '${DEPLOY_DIR}/releases'"
-          scp -i ~/.ssh/zzv2_deploy_key -P "${DEPLOY_PORT}" \
+          set -eu
+
+          missing=0
+          for name in SERVER_HOST SERVER_USER SERVER_SSH_KEY; do
+            value="${!name:-}"
+            if [ -z "$value" ]; then
+              echo "::error::$name is not configured"
+              missing=1
+            else
+              echo "$name is configured"
+            fi
+          done
+          if [ -z "${SERVER_PORT:-}" ]; then
+            echo "SERVER_PORT is not configured; defaulting to 22"
+          else
+            echo "SERVER_PORT is configured"
+          fi
+          [ "$missing" -eq 0 ] || exit 1
+
+          port="${SERVER_PORT:-22}"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" | perl -pe 's/\\n/\n/g' | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          ssh_base=(
+            -i ~/.ssh/deploy_key
+            -o IdentitiesOnly=yes
+            -o BatchMode=yes
+            -o StrictHostKeyChecking=no
+            -o UserKnownHostsFile=/dev/null
+            -o ConnectTimeout=15
+          )
+
+          remote_path=$(printf '%q' "$DEPLOY_PATH")
+          ssh "${ssh_base[@]}" -p "$port" "$SERVER_USER@$SERVER_HOST" "mkdir -p $remote_path/nginx $remote_path/releases"
+          scp "${ssh_base[@]}" -P "$port" \
             deploy/zzv2/docker-compose.yml \
             deploy/zzv2/.env.example \
             deploy/zzv2/remote-deploy.sh \
-            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/"
-          scp -i ~/.ssh/zzv2_deploy_key -P "${DEPLOY_PORT}" \
+            "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/"
+          scp "${ssh_base[@]}" -P "$port" \
             deploy/zzv2/nginx/sub2api-zzv2.conf \
-            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/nginx/sub2api-zzv2.conf"
+            "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/nginx/sub2api-zzv2.conf"
 
-      - name: Deploy on server
-        shell: bash
-        run: |
-          ssh -i ~/.ssh/zzv2_deploy_key -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "cd '${DEPLOY_DIR}' && chmod +x remote-deploy.sh && DEPLOY_DIR='${DEPLOY_DIR}' APP_IMAGE='${{ steps.meta.outputs.image }}' IMAGE_TAG='${{ steps.meta.outputs.image_tag }}' GHCR_USERNAME='${{ github.actor }}' GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}' ./remote-deploy.sh"
+          remote_env="DEPLOY_DIR=$(printf '%q' "$DEPLOY_PATH") IMAGE_TAG=$(printf '%q' "$IMAGE_TAG") GHCR_USERNAME=$(printf '%q' "$GHCR_USERNAME") GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN")"
+          ssh "${ssh_base[@]}" -p "$port" "$SERVER_USER@$SERVER_HOST" "$remote_env bash -s" <<'REMOTE_SCRIPT'
+            set -eu
+            cd "$DEPLOY_DIR"
+            chmod +x remote-deploy.sh
+            ./remote-deploy.sh
+          REMOTE_SCRIPT
