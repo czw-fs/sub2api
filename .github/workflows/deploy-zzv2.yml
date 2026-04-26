@@ -15,9 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DEPLOY_HOST: ${{ secrets.SERVER_HOST }}
-  DEPLOY_USER: ${{ secrets.SERVERUSER }}
-  DEPLOY_PORT: ${{ secrets.SERVER_PORT }}
+  DEPLOY_HOST: ${{ secrets.SERVER_HOST || '111.228.39.25' }}
+  DEPLOY_USER: ${{ secrets.SERVERUSER || 'root' }}
+  DEPLOY_PORT: ${{ secrets.SERVER_PORT || '22' }}
   DEPLOY_DIR: /work/project/zzv2
 
 jobs:
