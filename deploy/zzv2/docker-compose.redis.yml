@@ -12,14 +12,10 @@ services:
     volumes:
       - ./redis_data:/data
     command: >
-      sh -c '
-        redis-server
-        --save 60 1
-        --appendonly yes
-        --appendfsync everysec
-        ${REDIS_PASSWORD:+--requirepass "$REDIS_PASSWORD"}'
+      sh -c 'exec redis-server --save 60 1 --appendonly yes --appendfsync everysec $${REDIS_PASSWORD:+--requirepass "$$REDIS_PASSWORD"}'
     environment:
       - TZ=${TZ:-Asia/Shanghai}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - REDISCLI_AUTH=${REDIS_PASSWORD:-}
     networks:
       zzv2-system:
@@ -27,7 +23,7 @@ services:
           - redis
           - zzv2-redis
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
