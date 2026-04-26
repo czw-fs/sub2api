@@ -1,0 +1,97 @@
+name: Deploy zzv2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-zzv2
+  cancel-in-progress: false
+
+env:
+  DEPLOY_HOST: ${{ vars.ZZV2_DEPLOY_HOST || '111.228.39.25' }}
+  DEPLOY_USER: ${{ vars.ZZV2_DEPLOY_USER || 'root' }}
+  DEPLOY_PORT: ${{ vars.ZZV2_DEPLOY_PORT || '22' }}
+  DEPLOY_DIR: /work/project/zzv2
+  APP_IMAGE: sub2api-zzv2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set image tag
+        id: meta
+        shell: bash
+        run: |
+          short_sha="${GITHUB_SHA::12}"
+          echo "image_tag=sha-${short_sha}" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ env.APP_IMAGE }}:${{ steps.meta.outputs.image_tag }}
+          build-args: |
+            VERSION=zzv2-${{ steps.meta.outputs.image_tag }}
+            COMMIT=${{ github.sha }}
+            DATE=${{ steps.meta.outputs.build_date }}
+            GOPROXY=https://goproxy.cn,direct
+            GOSUMDB=sum.golang.google.cn
+            PNPM_VERSION=9.15.9
+            NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+
+      - name: Export Docker image
+        shell: bash
+        run: |
+          docker save "${APP_IMAGE}:${{ steps.meta.outputs.image_tag }}" | gzip > sub2api-image.tar.gz
+          sha256sum sub2api-image.tar.gz
+
+      - name: Prepare SSH
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.ZZV2_DEPLOY_SSH_KEY }}
+        run: |
+          test -n "${DEPLOY_SSH_KEY}" || { echo "Missing secret ZZV2_DEPLOY_SSH_KEY"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "${DEPLOY_SSH_KEY}" > ~/.ssh/zzv2_deploy_key
+          chmod 600 ~/.ssh/zzv2_deploy_key
+          ssh-keyscan -p "${DEPLOY_PORT}" "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Sync deployment files
+        shell: bash
+        run: |
+          ssh -i ~/.ssh/zzv2_deploy_key -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "mkdir -p '${DEPLOY_DIR}/nginx' '${DEPLOY_DIR}/releases'"
+          scp -i ~/.ssh/zzv2_deploy_key -P "${DEPLOY_PORT}" \
+            deploy/zzv2/docker-compose.yml \
+            deploy/zzv2/.env.example \
+            deploy/zzv2/remote-deploy.sh \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/"
+          scp -i ~/.ssh/zzv2_deploy_key -P "${DEPLOY_PORT}" \
+            deploy/zzv2/nginx/sub2api-zzv2.conf \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/nginx/sub2api-zzv2.conf"
+          scp -i ~/.ssh/zzv2_deploy_key -P "${DEPLOY_PORT}" \
+            sub2api-image.tar.gz \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/releases/sub2api-image-${{ steps.meta.outputs.image_tag }}.tar.gz"
+
+      - name: Deploy on server
+        shell: bash
+        run: |
+          ssh -i ~/.ssh/zzv2_deploy_key -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "cd '${DEPLOY_DIR}' && chmod +x remote-deploy.sh && DEPLOY_DIR='${DEPLOY_DIR}' APP_IMAGE='${APP_IMAGE}' IMAGE_TAG='${{ steps.meta.outputs.image_tag }}' ./remote-deploy.sh"
