@@ -5160,6 +5160,7 @@ export default {
         helpImageUrl: 'Help Image URL',
         manageProviders: 'Manage Providers',
         balancePaymentDisabled: 'Disable Balance Recharge',
+        balancePaymentDisabledHint: 'When enabled, users only see subscription plans and balance recharge orders are rejected',
         noLimit: 'Empty = no limit',
         helpImage: 'Help Image',
         helpImagePlaceholder: 'Upload or enter image URL',

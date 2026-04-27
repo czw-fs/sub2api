@@ -5321,6 +5321,7 @@ export default {
         helpImageUrl: '帮助图片链接',
         manageProviders: '管理服务商',
         balancePaymentDisabled: '禁用余额充值',
+        balancePaymentDisabledHint: '开启后用户端只展示订阅套餐，并拒绝创建余额充值订单',
         noLimit: '留空表示不限制',
         helpImage: '帮助图片',
         helpImagePlaceholder: '上传或输入图片链接',

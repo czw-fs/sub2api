@@ -567,6 +567,31 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(payload).not.toHaveProperty("payment_visible_method_wxpay_enabled");
   });
 
+  it("renders and saves the balance recharge disable switch", async () => {
+    const wrapper = mountView();
+
+    await flushPromises();
+    await openPaymentTab(wrapper);
+
+    const balanceDisabledToggle = wrapper.get(
+      '[data-testid="payment-balance-disabled"]',
+    );
+    expect((balanceDisabledToggle.element as HTMLInputElement).checked).toBe(
+      false,
+    );
+
+    await balanceDisabledToggle.setValue(true);
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_balance_disabled: true,
+      }),
+    );
+  });
+
   it("updates provider enablement immediately and reloads providers", async () => {
     const provider = {
       id: 7,

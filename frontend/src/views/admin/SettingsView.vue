@@ -4255,6 +4255,22 @@
                 <Toggle v-model="form.payment_enabled" />
               </div>
               <template v-if="form.payment_enabled">
+                <div
+                  class="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 dark:border-dark-700 dark:bg-dark-800/60"
+                >
+                  <div>
+                    <label class="font-medium text-gray-900 dark:text-white">{{
+                      t("admin.settings.payment.balancePaymentDisabled")
+                    }}</label>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      {{ t("admin.settings.payment.balancePaymentDisabledHint") }}
+                    </p>
+                  </div>
+                  <Toggle
+                    v-model="form.payment_balance_disabled"
+                    data-testid="payment-balance-disabled"
+                  />
+                </div>
                 <!-- Row 1: Product name -->
                 <div class="grid grid-cols-3 gap-3">
                   <div>
