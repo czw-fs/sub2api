@@ -4980,6 +4980,14 @@ export default {
         allowUngroupedKey: 'Allow Ungrouped Key Scheduling',
         allowUngroupedKeyHint: 'When disabled, API Keys not assigned to any group cannot make requests (403 Forbidden). Keep disabled to ensure all Keys belong to a specific group.'
       },
+      globalDailyUsageLimit: {
+        title: 'Global Daily Usage Limit',
+        description: 'Tracks all users actual spend over the last rolling 24 hours and rejects new requests after the limit is reached.',
+        enabled: 'Enable global usage limit',
+        enabledHint: 'When disabled, global spend is not checked. When enabled, exceeded requests return 429.',
+        amount: '24-hour limit',
+        amountHint: 'USD amount. 0 means unlimited; concurrent requests can make final spend slightly exceed this value.'
+      },
       gatewayForwarding: {
         title: 'Request Forwarding',
         description: 'Control how requests are forwarded to upstream OAuth accounts',

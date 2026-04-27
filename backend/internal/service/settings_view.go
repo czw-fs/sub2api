@@ -149,6 +149,8 @@ type SystemSettings struct {
 	EnableFingerprintUnification bool // 是否统一 OAuth 账号的指纹头（默认 true）
 	EnableMetadataPassthrough    bool // 是否透传客户端原始 metadata（默认 false）
 	EnableCCHSigning             bool // 是否对 billing header cch 进行签名（默认 false）
+	GlobalDailyUsageLimitEnabled bool // 是否启用全站 24 小时滚动消费额度上限
+	GlobalDailyUsageLimitUSD     float64
 
 	// Web Search Emulation
 	WebSearchEmulationEnabled bool // 是否启用 web search 模拟

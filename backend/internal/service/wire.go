@@ -397,11 +397,15 @@ func ProvideBillingCacheService(
 	userRepo UserRepository,
 	subRepo UserSubscriptionRepository,
 	apiKeyRepo APIKeyRepository,
+	settingRepo SettingRepository,
+	usageLogRepo UsageLogRepository,
 	rpmCache UserRPMCache,
 	rateRepo UserGroupRateRepository,
 	cfg *config.Config,
 ) *BillingCacheService {
-	return NewBillingCacheService(cache, userRepo, subRepo, apiKeyRepo, rpmCache, rateRepo, cfg)
+	svc := NewBillingCacheService(cache, userRepo, subRepo, apiKeyRepo, rpmCache, rateRepo, cfg)
+	svc.SetGlobalDailyUsageLimitDependencies(settingRepo, usageLogRepo)
+	return svc
 }
 
 // ProviderSet is the Wire provider set for all services

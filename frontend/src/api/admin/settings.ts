@@ -436,6 +436,8 @@ export interface SystemSettings {
   enable_fingerprint_unification: boolean;
   enable_metadata_passthrough: boolean;
   enable_cch_signing: boolean;
+  global_daily_usage_limit_enabled: boolean;
+  global_daily_usage_limit_usd: number;
   web_search_emulation_enabled?: boolean;
 
   // Payment configuration
@@ -600,6 +602,8 @@ export interface UpdateSettingsRequest {
   enable_fingerprint_unification?: boolean;
   enable_metadata_passthrough?: boolean;
   enable_cch_signing?: boolean;
+  global_daily_usage_limit_enabled?: boolean;
+  global_daily_usage_limit_usd?: number;
   // Payment configuration
   payment_enabled?: boolean;
   payment_min_amount?: number;

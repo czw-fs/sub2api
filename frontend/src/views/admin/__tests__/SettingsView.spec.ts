@@ -362,6 +362,8 @@ const baseSettingsResponse = {
   enable_fingerprint_unification: true,
   enable_metadata_passthrough: false,
   enable_cch_signing: false,
+  global_daily_usage_limit_enabled: false,
+  global_daily_usage_limit_usd: 0,
   payment_enabled: true,
   payment_min_amount: 1,
   payment_max_amount: 10000,
@@ -442,6 +444,16 @@ async function openUsersTab(wrapper: ReturnType<typeof mountView>) {
 
   expect(usersTabButton).toBeDefined();
   await usersTabButton?.trigger("click");
+  await flushPromises();
+}
+
+async function openGatewayTab(wrapper: ReturnType<typeof mountView>) {
+  const gatewayTabButton = wrapper
+    .findAll("button")
+    .find((node) => node.text().includes("admin.settings.tabs.gateway"));
+
+  expect(gatewayTabButton).toBeDefined();
+  await gatewayTabButton?.trigger("click");
   await flushPromises();
 }
 
@@ -665,6 +677,38 @@ describe("admin SettingsView payment visible method controls", () => {
       "默认关闭。开启后仅影响本网关在 OpenAI 账号间的实验性调度选择逻辑",
     );
     expect(wrapper.text()).not.toContain("OpenAI 高级调度器");
+  });
+
+  it("renders and saves global daily usage limit settings", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      global_daily_usage_limit_enabled: true,
+      global_daily_usage_limit_usd: 80,
+    });
+    const wrapper = mountView();
+
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    const enabledToggle = wrapper.get(
+      '[data-testid="global-daily-usage-limit-enabled"]',
+    );
+    const limitInput = wrapper.get(
+      '[data-testid="global-daily-usage-limit-usd"]',
+    );
+    expect((enabledToggle.element as HTMLInputElement).checked).toBe(true);
+    expect((limitInput.element as HTMLInputElement).value).toBe("80");
+
+    await limitInput.setValue("120.5");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        global_daily_usage_limit_enabled: true,
+        global_daily_usage_limit_usd: 120.5,
+      }),
+    );
   });
 
   it("passes translated upload and remove labels to the payment help image uploader", async () => {

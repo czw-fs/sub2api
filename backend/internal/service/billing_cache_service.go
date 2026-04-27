@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -11,6 +12,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -18,8 +20,9 @@ import (
 // 注：ErrInsufficientBalance在redeem_service.go中定义
 // 注：ErrDailyLimitExceeded/ErrWeeklyLimitExceeded/ErrMonthlyLimitExceeded在subscription_service.go中定义
 var (
-	ErrSubscriptionInvalid       = infraerrors.Forbidden("SUBSCRIPTION_INVALID", "subscription is invalid or expired")
-	ErrBillingServiceUnavailable = infraerrors.ServiceUnavailable("BILLING_SERVICE_ERROR", "Billing service temporarily unavailable. Please retry later.")
+	ErrSubscriptionInvalid           = infraerrors.Forbidden("SUBSCRIPTION_INVALID", "subscription is invalid or expired")
+	ErrBillingServiceUnavailable     = infraerrors.ServiceUnavailable("BILLING_SERVICE_ERROR", "Billing service temporarily unavailable. Please retry later.")
+	ErrGlobalDailyUsageLimitExceeded = infraerrors.TooManyRequests("GLOBAL_DAILY_USAGE_LIMIT_EXCEEDED", "global daily usage limit exceeded")
 	// RPM 超限错误。gateway_handler 负责映射为 HTTP 429。
 	ErrGroupRPMExceeded = infraerrors.TooManyRequests("GROUP_RPM_EXCEEDED", "group requests-per-minute limit exceeded")
 	ErrUserRPMExceeded  = infraerrors.TooManyRequests("USER_RPM_EXCEEDED", "user requests-per-minute limit exceeded")
@@ -83,6 +86,14 @@ type apiKeyRateLimitLoader interface {
 	GetRateLimitData(ctx context.Context, keyID int64) (*APIKeyRateLimitData, error)
 }
 
+type globalUsageStatsReader interface {
+	GetGlobalStats(ctx context.Context, startTime, endTime time.Time) (*usagestats.UsageStats, error)
+}
+
+type globalDailyUsageLimitSettingsReader interface {
+	GetMultiple(ctx context.Context, keys []string) (map[string]string, error)
+}
+
 // BillingCacheService 计费缓存服务
 // 负责余额和订阅数据的缓存管理，提供高性能的计费资格检查
 type BillingCacheService struct {
@@ -90,6 +101,8 @@ type BillingCacheService struct {
 	userRepo              UserRepository
 	subRepo               UserSubscriptionRepository
 	apiKeyRateLimitLoader apiKeyRateLimitLoader
+	settingRepo           globalDailyUsageLimitSettingsReader
+	globalUsageStats      globalUsageStatsReader
 	userRPMCache          UserRPMCache
 	userGroupRateRepo     UserGroupRateRepository
 	cfg                   *config.Config
@@ -106,6 +119,12 @@ type BillingCacheService struct {
 	cacheWriteDropFullLastLog   int64
 	cacheWriteDropClosedCount   uint64
 	cacheWriteDropClosedLastLog int64
+}
+
+// SetGlobalDailyUsageLimitDependencies injects optional global limit dependencies.
+func (s *BillingCacheService) SetGlobalDailyUsageLimitDependencies(settingRepo globalDailyUsageLimitSettingsReader, usageStats globalUsageStatsReader) {
+	s.settingRepo = settingRepo
+	s.globalUsageStats = usageStats
 }
 
 // NewBillingCacheService 创建计费缓存服务
@@ -672,6 +691,10 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 		}
 	}
 
+	if err := s.checkGlobalDailyUsageLimit(ctx); err != nil {
+		return err
+	}
+
 	// Check API Key rate limits (applies to both billing modes)
 	if apiKey != nil && apiKey.HasRateLimits() {
 		if err := s.checkAPIKeyRateLimits(ctx, apiKey); err != nil {
@@ -684,6 +707,40 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 		return err
 	}
 
+	return nil
+}
+
+func (s *BillingCacheService) checkGlobalDailyUsageLimit(ctx context.Context) error {
+	if s == nil || s.settingRepo == nil || s.globalUsageStats == nil {
+		return nil
+	}
+
+	values, err := s.settingRepo.GetMultiple(ctx, []string{
+		SettingKeyGlobalDailyUsageLimitEnabled,
+		SettingKeyGlobalDailyUsageLimitUSD,
+	})
+	if err != nil {
+		slog.Warn("global daily usage limit settings lookup failed", "error", err)
+		return nil
+	}
+	if values[SettingKeyGlobalDailyUsageLimitEnabled] != "true" {
+		return nil
+	}
+	limit, err := strconv.ParseFloat(values[SettingKeyGlobalDailyUsageLimitUSD], 64)
+	if err != nil || limit <= 0 {
+		return nil
+	}
+
+	end := time.Now()
+	start := end.Add(-24 * time.Hour)
+	stats, err := s.globalUsageStats.GetGlobalStats(ctx, start, end)
+	if err != nil {
+		slog.Warn("global daily usage limit stats lookup failed", "error", err)
+		return nil
+	}
+	if stats != nil && stats.TotalActualCost >= limit {
+		return ErrGlobalDailyUsageLimitExceeded
+	}
 	return nil
 }
 

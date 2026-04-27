@@ -243,6 +243,23 @@ func TestSettingService_UpdateSettings_PaymentVisibleMethodsAndAdvancedScheduler
 	require.Equal(t, "true", repo.updates[openAIAdvancedSchedulerSettingKey])
 }
 
+func TestSettingService_UpdateSettings_GlobalDailyUsageLimit(t *testing.T) {
+	repo := &settingUpdateRepoStub{}
+	svc := NewSettingService(repo, &config.Config{})
+
+	err := svc.UpdateSettings(context.Background(), &SystemSettings{
+		GlobalDailyUsageLimitEnabled: true,
+		GlobalDailyUsageLimitUSD:     80.5,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "true", repo.updates[SettingKeyGlobalDailyUsageLimitEnabled])
+	require.Equal(t, "80.50000000", repo.updates[SettingKeyGlobalDailyUsageLimitUSD])
+
+	got := svc.parseSettings(repo.updates)
+	require.True(t, got.GlobalDailyUsageLimitEnabled)
+	require.Equal(t, 80.5, got.GlobalDailyUsageLimitUSD)
+}
+
 func TestSettingService_UpdateSettings_RejectsInvalidPaymentVisibleMethodSource(t *testing.T) {
 	repo := &settingUpdateRepoStub{}
 	svc := NewSettingService(repo, &config.Config{})

@@ -321,6 +321,10 @@ const (
 	SettingKeyEnableMetadataPassthrough = "enable_metadata_passthrough"
 	// SettingKeyEnableCCHSigning 是否对 billing header 中的 cch 进行 xxHash64 签名（默认 false）
 	SettingKeyEnableCCHSigning = "enable_cch_signing"
+	// SettingKeyGlobalDailyUsageLimitEnabled 全站 24 小时滚动消费额度上限开关（默认 false）
+	SettingKeyGlobalDailyUsageLimitEnabled = "global_daily_usage_limit_enabled"
+	// SettingKeyGlobalDailyUsageLimitUSD 全站 24 小时滚动消费额度上限（USD，0 = 不限制）
+	SettingKeyGlobalDailyUsageLimitUSD = "global_daily_usage_limit_usd"
 
 	// Balance Low Notification
 	SettingKeyBalanceLowNotifyEnabled     = "balance_low_notify_enabled"      // 全局开关

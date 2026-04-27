@@ -5139,6 +5139,14 @@ export default {
         allowUngroupedKey: '允许未分组 Key 调度',
         allowUngroupedKeyHint: '关闭后，未分配到任何分组的 API Key 将无法发起请求（返回 403）。建议保持关闭以确保所有 Key 都归属明确的分组。'
       },
+      globalDailyUsageLimit: {
+        title: '全站每日额度上限',
+        description: '按过去 24 小时滚动统计所有用户实际消费，达到上限后拒绝新请求。',
+        enabled: '启用全站额度上限',
+        enabledHint: '关闭后不检查全站消费额度；开启后达到额度会返回 429。',
+        amount: '24 小时额度上限',
+        amountHint: '单位为美元。0 表示不限制；并发请求可能导致最终消费略微超过该值。'
+      },
       gatewayForwarding: {
         title: '请求转发行为',
         description: '控制请求转发到上游 OAuth 账号时的行为',

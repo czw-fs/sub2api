@@ -1227,6 +1227,11 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyEnableFingerprintUnification] = strconv.FormatBool(settings.EnableFingerprintUnification)
 	updates[SettingKeyEnableMetadataPassthrough] = strconv.FormatBool(settings.EnableMetadataPassthrough)
 	updates[SettingKeyEnableCCHSigning] = strconv.FormatBool(settings.EnableCCHSigning)
+	if math.IsNaN(settings.GlobalDailyUsageLimitUSD) || math.IsInf(settings.GlobalDailyUsageLimitUSD, 0) || settings.GlobalDailyUsageLimitUSD < 0 {
+		settings.GlobalDailyUsageLimitUSD = 0
+	}
+	updates[SettingKeyGlobalDailyUsageLimitEnabled] = strconv.FormatBool(settings.GlobalDailyUsageLimitEnabled)
+	updates[SettingKeyGlobalDailyUsageLimitUSD] = strconv.FormatFloat(settings.GlobalDailyUsageLimitUSD, 'f', 8, 64)
 	updates[SettingPaymentVisibleMethodAlipaySource] = settings.PaymentVisibleMethodAlipaySource
 	updates[SettingPaymentVisibleMethodWxpaySource] = settings.PaymentVisibleMethodWxpaySource
 	updates[SettingPaymentVisibleMethodAlipayEnabled] = strconv.FormatBool(settings.PaymentVisibleMethodAlipayEnabled)
@@ -1812,6 +1817,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 		// 分组隔离（默认不允许未分组 Key 调度）
 		SettingKeyAllowUngroupedKeyScheduling:    "false",
+		SettingKeyGlobalDailyUsageLimitEnabled:   "false",
+		SettingKeyGlobalDailyUsageLimitUSD:       "0",
 		SettingPaymentVisibleMethodAlipaySource:  "",
 		SettingPaymentVisibleMethodWxpaySource:   "",
 		SettingPaymentVisibleMethodAlipayEnabled: "false",
@@ -2144,6 +2151,10 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	}
 	result.EnableMetadataPassthrough = settings[SettingKeyEnableMetadataPassthrough] == "true"
 	result.EnableCCHSigning = settings[SettingKeyEnableCCHSigning] == "true"
+	result.GlobalDailyUsageLimitEnabled = settings[SettingKeyGlobalDailyUsageLimitEnabled] == "true"
+	if v, err := strconv.ParseFloat(strings.TrimSpace(settings[SettingKeyGlobalDailyUsageLimitUSD]), 64); err == nil && v > 0 {
+		result.GlobalDailyUsageLimitUSD = v
+	}
 
 	// Web search emulation: quick enabled check from the JSON config
 	if raw := settings[SettingKeyWebSearchEmulationConfig]; raw != "" {

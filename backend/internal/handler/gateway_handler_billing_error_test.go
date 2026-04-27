@@ -26,6 +26,14 @@ func TestBillingErrorDetails_MapsUserRPMExceededToTooManyRequests(t *testing.T) 
 	require.LessOrEqual(t, retryAfter, 60)
 }
 
+func TestBillingErrorDetails_MapsGlobalDailyLimitExceededToTooManyRequests(t *testing.T) {
+	status, code, msg, retryAfter := billingErrorDetails(service.ErrGlobalDailyUsageLimitExceeded)
+	require.Equal(t, http.StatusTooManyRequests, status)
+	require.Equal(t, "rate_limit_exceeded", code)
+	require.NotEmpty(t, msg)
+	require.Equal(t, 0, retryAfter)
+}
+
 func TestBillingErrorDetails_APIKeyRateLimitStillMaps(t *testing.T) {
 	// 回归保护：加 RPM 分支后不应影响已有 APIKey rate limit 的映射。
 	for _, err := range []error{

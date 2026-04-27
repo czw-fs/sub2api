@@ -206,6 +206,8 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		EnableFingerprintUnification:           settings.EnableFingerprintUnification,
 		EnableMetadataPassthrough:              settings.EnableMetadataPassthrough,
 		EnableCCHSigning:                       settings.EnableCCHSigning,
+		GlobalDailyUsageLimitEnabled:           settings.GlobalDailyUsageLimitEnabled,
+		GlobalDailyUsageLimitUSD:               settings.GlobalDailyUsageLimitUSD,
 		WebSearchEmulationEnabled:              settings.WebSearchEmulationEnabled,
 		PaymentVisibleMethodAlipaySource:       settings.PaymentVisibleMethodAlipaySource,
 		PaymentVisibleMethodWxpaySource:        settings.PaymentVisibleMethodWxpaySource,
@@ -393,9 +395,11 @@ type UpdateSettingsRequest struct {
 	BackendModeEnabled bool `json:"backend_mode_enabled"`
 
 	// Gateway forwarding behavior
-	EnableFingerprintUnification *bool `json:"enable_fingerprint_unification"`
-	EnableMetadataPassthrough    *bool `json:"enable_metadata_passthrough"`
-	EnableCCHSigning             *bool `json:"enable_cch_signing"`
+	EnableFingerprintUnification *bool    `json:"enable_fingerprint_unification"`
+	EnableMetadataPassthrough    *bool    `json:"enable_metadata_passthrough"`
+	EnableCCHSigning             *bool    `json:"enable_cch_signing"`
+	GlobalDailyUsageLimitEnabled *bool    `json:"global_daily_usage_limit_enabled"`
+	GlobalDailyUsageLimitUSD     *float64 `json:"global_daily_usage_limit_usd"`
 
 	// Payment visible method routing
 	PaymentVisibleMethodAlipaySource  *string `json:"payment_visible_method_alipay_source"`
@@ -499,6 +503,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	req.SMTPFromName = strings.TrimSpace(req.SMTPFromName)
 	if req.SMTPPort <= 0 {
 		req.SMTPPort = 587
+	}
+	if req.GlobalDailyUsageLimitUSD != nil && *req.GlobalDailyUsageLimitUSD < 0 {
+		response.Error(c, http.StatusBadRequest, "global_daily_usage_limit_usd must be greater than or equal to 0")
+		return
 	}
 	req.DefaultSubscriptions = normalizeDefaultSubscriptions(req.DefaultSubscriptions)
 	req.AuthSourceDefaultEmailSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultEmailSubscriptions)
@@ -1192,6 +1200,18 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.EnableCCHSigning
 		}(),
+		GlobalDailyUsageLimitEnabled: func() bool {
+			if req.GlobalDailyUsageLimitEnabled != nil {
+				return *req.GlobalDailyUsageLimitEnabled
+			}
+			return previousSettings.GlobalDailyUsageLimitEnabled
+		}(),
+		GlobalDailyUsageLimitUSD: func() float64 {
+			if req.GlobalDailyUsageLimitUSD != nil {
+				return *req.GlobalDailyUsageLimitUSD
+			}
+			return previousSettings.GlobalDailyUsageLimitUSD
+		}(),
 		PaymentVisibleMethodAlipaySource: func() string {
 			if req.PaymentVisibleMethodAlipaySource != nil {
 				return strings.TrimSpace(*req.PaymentVisibleMethodAlipaySource)
@@ -1478,6 +1498,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		EnableFingerprintUnification:           updatedSettings.EnableFingerprintUnification,
 		EnableMetadataPassthrough:              updatedSettings.EnableMetadataPassthrough,
 		EnableCCHSigning:                       updatedSettings.EnableCCHSigning,
+		GlobalDailyUsageLimitEnabled:           updatedSettings.GlobalDailyUsageLimitEnabled,
+		GlobalDailyUsageLimitUSD:               updatedSettings.GlobalDailyUsageLimitUSD,
 		PaymentVisibleMethodAlipaySource:       updatedSettings.PaymentVisibleMethodAlipaySource,
 		PaymentVisibleMethodWxpaySource:        updatedSettings.PaymentVisibleMethodWxpaySource,
 		PaymentVisibleMethodAlipayEnabled:      updatedSettings.PaymentVisibleMethodAlipayEnabled,

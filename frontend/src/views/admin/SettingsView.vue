@@ -190,6 +190,67 @@
 
         <!-- Tab: Gateway -->
         <div v-show="activeTab === 'gateway'" class="space-y-6">
+          <!-- Global Daily Usage Limit -->
+          <div class="card">
+            <div
+              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+            >
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                {{ t("admin.settings.globalDailyUsageLimit.title") }}
+              </h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t("admin.settings.globalDailyUsageLimit.description") }}
+              </p>
+            </div>
+            <div class="space-y-5 p-6">
+              <div class="flex items-center justify-between">
+                <div>
+                  <label
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.globalDailyUsageLimit.enabled") }}
+                  </label>
+                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.globalDailyUsageLimit.enabledHint") }}
+                  </p>
+                </div>
+                <Toggle
+                  v-model="form.global_daily_usage_limit_enabled"
+                  data-testid="global-daily-usage-limit-enabled"
+                />
+              </div>
+
+              <div
+                class="border-t border-gray-100 pt-4 dark:border-dark-700"
+              >
+                <label
+                  class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  {{ t("admin.settings.globalDailyUsageLimit.amount") }}
+                </label>
+                <div class="relative max-w-xs">
+                  <span
+                    class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-gray-400"
+                  >
+                    $
+                  </span>
+                  <input
+                    v-model.number="form.global_daily_usage_limit_usd"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="input pl-7"
+                    data-testid="global-daily-usage-limit-usd"
+                    :disabled="!form.global_daily_usage_limit_enabled"
+                  />
+                </div>
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.globalDailyUsageLimit.amountHint") }}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <!-- Overload Cooldown (529) Settings -->
           <div class="card">
             <div
@@ -5485,6 +5546,8 @@ const form = reactive<SettingsForm>({
   enable_fingerprint_unification: true,
   enable_metadata_passthrough: false,
   enable_cch_signing: false,
+  global_daily_usage_limit_enabled: false,
+  global_daily_usage_limit_usd: 0,
   // Balance & quota notification
   balance_low_notify_enabled: false,
   balance_low_notify_threshold: 0,
@@ -6373,6 +6436,9 @@ async function saveSettings() {
       enable_fingerprint_unification: form.enable_fingerprint_unification,
       enable_metadata_passthrough: form.enable_metadata_passthrough,
       enable_cch_signing: form.enable_cch_signing,
+      global_daily_usage_limit_enabled: form.global_daily_usage_limit_enabled,
+      global_daily_usage_limit_usd:
+        Number(form.global_daily_usage_limit_usd) || 0,
       // Payment configuration
       payment_enabled: form.payment_enabled,
       payment_min_amount: Number(form.payment_min_amount) || 0,
