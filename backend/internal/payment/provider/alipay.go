@@ -70,7 +70,7 @@ func (a *Alipay) getClient() (*alipay.Client, error) {
 	if a.client != nil {
 		return a.client, nil
 	}
-	client, err := alipayNewClient(a.config["appId"], a.config["privateKey"], false)
+	client, err := alipayNewClient(a.config["appId"], a.config["privateKey"], true)
 	if err != nil {
 		return nil, fmt.Errorf("alipay init client: %w", err)
 	}

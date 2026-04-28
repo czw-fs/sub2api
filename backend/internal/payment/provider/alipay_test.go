@@ -136,7 +136,7 @@ func TestNewAlipay(t *testing.T) {
 	}
 }
 
-func TestAlipayClientDefaultsToSandbox(t *testing.T) {
+func TestAlipayClientDefaultsToProduction(t *testing.T) {
 	origNewClient := alipayNewClient
 	t.Cleanup(func() {
 		alipayNewClient = origNewClient
@@ -145,19 +145,19 @@ func TestAlipayClientDefaultsToSandbox(t *testing.T) {
 	var gotProduction *bool
 	alipayNewClient = func(appID, privateKey string, production bool, opts ...alipay.OptionFunc) (*alipay.Client, error) {
 		gotProduction = &production
-		if appID != "sandbox-app" {
-			t.Fatalf("appID = %q, want sandbox-app", appID)
+		if appID != "production-app" {
+			t.Fatalf("appID = %q, want production-app", appID)
 		}
-		if privateKey != "sandbox-private-key" {
-			t.Fatalf("privateKey = %q, want sandbox-private-key", privateKey)
+		if privateKey != "production-private-key" {
+			t.Fatalf("privateKey = %q, want production-private-key", privateKey)
 		}
 		return &alipay.Client{}, nil
 	}
 
 	provider := &Alipay{
 		config: map[string]string{
-			"appId":      "sandbox-app",
-			"privateKey": "sandbox-private-key",
+			"appId":      "production-app",
+			"privateKey": "production-private-key",
 			"publicKey":  "not-a-public-key",
 		},
 	}
@@ -169,8 +169,8 @@ func TestAlipayClientDefaultsToSandbox(t *testing.T) {
 	if gotProduction == nil {
 		t.Fatal("alipay client was not initialized")
 	}
-	if *gotProduction {
-		t.Fatal("alipay client production = true, want false for sandbox mode")
+	if !*gotProduction {
+		t.Fatal("alipay client production = false, want true for production mode")
 	}
 }
 
